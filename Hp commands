@@ -1,0 +1,23 @@
+LID A DRIVE
+ 
+
+hpssacli ctrl slot=1 physicaldrive 1I:1:12 modify led=on duration=3600
+
+
+hpssacli ctrl all show config | grep -i fail
+
+hpssacli ctrl all show status
+
+systemctl start hp-health
+
+ansible -i build-2-hosts -mping all
+
+/home/mysqlscripts/scripts
+
+
+./return_to_pool -b 189 -k
+
+./find_host 14971
+
+service hp-health status
+service hp-health restart
