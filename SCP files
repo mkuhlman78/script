@@ -1,12 +1,12 @@
-scp mkuhlman@las1-1-001.idm.mz-inc.com:~/sosreport-mkuhlman.09272017-20170927195846.tar.xz ~/Downloads
+scp mkuhlman@hostname:~/sosreport-mkuhlman.09272017-20170927195846.tar.xz ~/Downloads
  
  
 
-scp /tmp/sosreport-mkuhlman.5322951043-20170921174442.tar.xz mkuhlman@las1-1-001.idm.mz-inc.com:
+scp /tmp/sosreport-mkuhlman.5322951043-20170921174442.tar.xz mkuhlman@hostname:
 
 
 
-scp -o StrictHostKeyChecking=no /var/tmp/sosreport-mkuhlman.5324384558-20171113222457.tar.xz mkuhlman@las1-1-001.idm.mz-inc.com:
+scp -o StrictHostKeyChecking=no /var/tmp/sosreport-mkuhlman.5324384558-20171113222457.tar.xz mkuhlman@hostname:
 
 
 
