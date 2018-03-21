@@ -10,4 +10,4 @@ scp -o StrictHostKeyChecking=no /var/tmp/sosreport-mkuhlman.5324384558-201711132
 
 
 
-scp /tmp/fio-bugreport-20180206.183947-tnhTyW.tar.bz2 mkuhlman@las1-1-001.idm.mz-inc.com:
+scp /tmp/fio-bugreport-20180206.183947-tnhTyW.tar.bz2 mkuhlman@hostname:
