@@ -24,7 +24,7 @@ def GetJira(username, password_handler):
             options = {'agile_rest_path': 'agile', 'verify': False}
             password = password_handler()
 
-            jira = JIRA(server='https://jira.addsrv.com',
+            jira = JIRA(server='https://jiraip',
                         options=options, basic_auth=(username, password))
             break
         except KeyboardInterrupt:
@@ -72,7 +72,7 @@ def GetDcopsFields(username, hostname, f5_ok, live_cfg_ok, dcops_reboot_ok, summ
 
         summary = raw_input("Summary of issue: ")
     try:
-        pos_f = urlopen("http://pos.addsrv.com/enc.php?host=" + hostname)
+        pos_f = urlopen("http://database/enc.php?host=" + hostname)
         pos_json = json.loads(pos_f.read().decode('utf-8'))
         pos_f.close()
         pos_data = ''
@@ -80,7 +80,7 @@ def GetDcopsFields(username, hostname, f5_ok, live_cfg_ok, dcops_reboot_ok, summ
             pos_data += "| *{:20s}* | {:40s} |\n".format(key, pos_json[key])
         print pos_data
     except IOError as err:
-        print("Can't read from pos.addsrv.com: %s" % (err))
+        print("Can't read from database.com: %s" % (err))
         exit(-2)
 
     d = {'hostname': hostname, 'f5_ok': f5_ok, 'live_cfg_ok': live_cfg_ok,
@@ -104,7 +104,7 @@ def GetDcopsFields(username, hostname, f5_ok, live_cfg_ok, dcops_reboot_ok, summ
 5. May DCOPS reboot the server?
 {code}$dcops_reboot_ok{code}
 
-6. Provide all host info from POS (http://pos.addsrv.com).
+6. Provide all host info from POS (http://database).
 {code}$pos_data{code}
                            """).substitute(d)
 
