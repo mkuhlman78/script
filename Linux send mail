@@ -1,0 +1,1 @@
+grep -v 'No such file or directory' hpasm.txt |grep -v 'Not connected'|grep -v 'No response'|grep -v vmtemplate-1-001.shared.adm.las1.mz-inc.com|sort|mail -s hpasm_output mkuhlman@mz.com
