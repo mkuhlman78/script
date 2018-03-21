@@ -1,0 +1,14 @@
+Configure an SNMP agent and Community String in Windows 2012
+1. Log into your dedicated server using Remote Desktop
+2. Click on Windows Key > Administrative Tools > Server Manager.
+3. Click Manage >  Add Roles and Features.
+4. Click Next > Next > Next > Next. Verify SNMP Services are installed. Click Cancel. If SNMP is not installed, contact Support.  
+￼
+
+1. Click on Windows Key > Administrative Tools > Services.
+2. Right click on SNMP Service and click on Properties.
+3. Click on the Security tab. 
+4. Type your randomized 8 - 10 character connection string. Be sure to make it Read Only, not Read Write.  
+￼
+5.   
+6. Click on Add.
