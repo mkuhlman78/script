@@ -1,0 +1,25 @@
+$ cat lom_license_config
+#!/usr/bin/python
+
+from hp_ilo_rest import *
+import yaml
+import sys
+import argparse
+import pos
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('id', help='POS ID of target system', type=int)
+    args = parser.parse_args()
+    target_ids = [args.id]
+    print target_ids
+    p = pos.pos(key='pos_db_ro')
+    h = HPiLO(ids=target_ids)
+    data = json.dumps({'LicenseKey': '3QLC8-2ZW94-2VD6N-TCQ3N-H5P22'})
+    result = h.iLO_operation(operation='post', uripath='/rest/v1/Managers/1/LicenseService', data=data)
+    h.logout()
+    return
+
+if __name__ == "__main__":
+    sys.exit(main())
+(venv)ROOT@pxe-1-001.shared.adm.las1:~/pos
