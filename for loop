@@ -1,0 +1,8 @@
+OOT@pxe-1-001.shared.adm.las1:~/pos
+$ for I in $(cat license.txt); do echo  ./lom_license_config $(./find_host -i $I); done
+[139]
+[140]
+[141]
+[142]
+[143]
+
