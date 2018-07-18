@@ -1,0 +1,27 @@
+$ cat generate_ilos_yaml
+#!/usr/bin/env python
+
+import yaml
+
+
+
+myjson="/tmp/ilo_reservations.json"
+username = 'Administrator'
+password = ''
+
+
+def main():
+  hosts = {}
+  try:
+    with open(myjson, 'rb') as fjson:
+      hosts = yaml.safe_load(fjson)['results']
+    for host in hosts:
+      if host['lom_ip'] and host['bios_config']:
+        print host['lom_ip'] + ": {bioscfgpath: './" + host['bios_config'] + "', password: '" + password + "',  username: '" + username + "'}"
+  except Exception as ex:
+    print ex
+
+
+if __name__ == '__main__':
+  exit(main())
+(venv)ROOT@pxe-1-001.shared.adm.las1:~/pos
