@@ -1,0 +1,362 @@
+$ cat vlan
+#!/usr/bin/env python
+
+"""
+Set the Top of Rack (TOR) switch VLANs in LAS1
+"""
+
+from netmiko import ConnectHandler
+from netmiko.ssh_exception import NetMikoTimeoutException, NetMikoAuthenticationException
+import getpass
+import csv
+import sys
+import logging
+import MySQLdb
+import time
+
+
+# Results in same overall maximum time (1500 * .01 vs 150 * .1)
+NETMIKO_DELAY=.02
+NETMIKO_LOOPS=1500
+
+OPSROBOT_CREDENTIALS = {
+  'username': 'opsrobot',
+  'password': 'DragonBornTacoBravo555#'
+}
+ADMIN_CREDENTIALS = {
+  'username': 'admin',
+  'password': 'hp0nly'
+}
+
+class CiscoIOS(object):
+  '''
+  Cisco Class variables
+  '''
+  # Set an early default socket timeout for SSH2()
+  SOCKET_TIMEOUT_SECONDS = 5
+  # Run this before command list
+  COMMAND_LIST_PREFIX = '''
+conf t
+!
+'''
+  # Run this after commmand list
+  COMMAND_LIST_SUFFIX = '''
+!
+end
+!
+copy run start
+!
+'''
+  PROMPT=r'[^#]#\s*$'
+
+  def __init__(self, switch_ips, port, vlan, description, sku):
+    '''
+    Cisco instance variables
+    '''
+    self.config_values_a = {
+      'device_type': 'cisco_ios', 'ip': switch_ips[0],
+      'username': OPSROBOT_CREDENTIALS['username'], 'password': OPSROBOT_CREDENTIALS['password'],
+      'secret': '', 'verbose': 'true', 'global_delay_factor': NETMIKO_DELAY
+    }
+    self.config_values_b = {
+      'device_type': 'cisco_ios', 'ip': switch_ips[1],
+      'username': OPSROBOT_CREDENTIALS['username'], 'password': OPSROBOT_CREDENTIALS['password'],
+      'secret': '', 'verbose': 'true', 'global_delay_factor': NETMIKO_DELAY
+    }
+    self.port = port
+    self.vlan = vlan
+    self.description = description
+    self.sku = sku
+    self.username = OPSROBOT_CREDENTIALS['username']
+    self.password = OPSROBOT_CREDENTIALS['password']
+
+
+  def get_port(self):
+    return self.port
+
+
+  def get_vlan(self):
+    return self.vlan
+
+  def get_description(self):
+    return self.description
+
+  def get_sku(self):
+    return self.sku
+
+  def format_set_vlan_command(self, a_or_b=None):
+    port = int(self.get_port())
+    vlan = int(self.get_vlan())
+    description = self.get_description()
+    return '''%s
+Interface E1/%d
+Switchport access VLAN %d
+Description %s
+%s
+''' % (CiscoIOS.COMMAND_LIST_PREFIX,
+        port, vlan, description,
+        CiscoIOS.COMMAND_LIST_SUFFIX)
+
+
+class HPComware(object):
+  '''
+  HPComware class variables
+  '''
+  # Set an early default socket timeout for SSH2()
+  SOCKET_TIMEOUT_SECONDS = 5
+
+  # Run this before command list
+  COMMAND_LIST_PREFIX = '''system-view
+'''
+
+  # Run this after commmand list
+  COMMAND_LIST_SUFFIX = '''
+return
+save force
+'''
+  PROMPT = r'\[.*\]$|<.*>'
+
+
+  def __init__(self, switch_ips, port, vlan, description, sku, pod):
+    '''
+    HPComware class variables
+    '''
+    self.config_values_a = {
+        'device_type': 'hp_comware', 'ip': switch_ips[0],
+        'global_delay_factor': NETMIKO_DELAY
+    }
+    self.config_values_b = {
+        'device_type': 'hp_comware', 'ip': switch_ips[1],
+        'global_delay_factor': NETMIKO_DELAY
+    }
+    self.port = port
+    self.vlan = vlan
+    self.description = description
+    self.sku = sku
+    self.pod = pod
+    self.username = ADMIN_CREDENTIALS['username']
+    self.password = ADMIN_CREDENTIALS['password']
+
+    if self.pod in (3, 4):
+        self.config_values_a['username'] = OPSROBOT_CREDENTIALS['username']
+        self.config_values_a['password'] = OPSROBOT_CREDENTIALS['password']
+        self.config_values_b['username'] = OPSROBOT_CREDENTIALS['username']
+        self.config_values_b['password'] = OPSROBOT_CREDENTIALS['password']
+    else:
+        self.config_values_a['username'] = ADMIN_CREDENTIALS['username']
+        self.config_values_a['password'] = ADMIN_CREDENTIALS['password']
+        self.config_values_b['username'] = ADMIN_CREDENTIALS['username']
+        self.config_values_b['password'] = ADMIN_CREDENTIALS['password']
+
+
+  def get_port(self):
+    return self.port
+
+
+  def get_vlan(self):
+    return self.vlan
+
+  def get_description(self):
+    return self.description
+
+  def get_sku(self):
+    return self.sku
+
+
+  def port_num_to_s(self, port, a_or_b):
+    '''
+    translate port from a or b
+    '''
+    if a_or_b == 'a' or self.get_sku() == 'HP002':
+        first_part = '1'
+    else:
+        first_part = '2'
+    if port > 24:
+        next_part = '/2/' + str(port - 24)
+    else:
+        next_part = '/1/' + str(port)
+    return first_part + next_part
+
+
+  def format_set_vlan_command(self, a_or_b):
+    '''
+    formating set of vlan commands
+    '''
+    port = int(self.get_port())
+    vlan = int(self.get_vlan())
+    sku = str(self.get_sku())
+    description = self.get_description()
+    return '''%s
+interface Ten-GigabitEthernet %s
+port access vlan %d
+description %s
+%s
+''' % (HPComware.COMMAND_LIST_PREFIX,
+       self.port_num_to_s(port, a_or_b),
+       vlan, description,
+       HPComware.COMMAND_LIST_SUFFIX)
+
+
+class PoSConnect(object):
+  '''
+  Connect to POS DB
+  '''
+  def __init__(self):
+    '''
+    connect to db
+    '''
+    self.db = MySQLdb.connect(
+            host="techopsisdb-1-vip.shared.adm.las1.mz-inc.com",
+            user="pos_ro",passwd="jghd7rhrnadfDFajdg3",db="posdb")
+
+
+  def fetch(self, id):
+    '''
+    fetching data from PoS DB
+    '''
+    with self.db:
+      try:
+        cur = self.db.cursor()
+        #cur.execute("SELECT rack, port, vlan_id, host, switch_sku FROM pos_flat WHERE id = '%s'" % id)
+        cur.execute("SELECT f.rack, f.port, f.vlan_id, f.host, f.switch_sku, f.pod, p.layer3 FROM pos_flat f inner join pods p on f.pod = p.pod and f.datacenter = p.datacenter WHERE f.id = '%s'" % id)
+        print 'fetching db with id %s'%(id)
+        return cur.fetchone()
+      except Exception, e:
+        traceback.print_exc()
+
+
+  def __del__(self):
+    '''
+    closing db
+    '''
+    self.db.close()
+
+
+class Switch_config(object):
+  '''
+  Defines switch config
+  '''
+  # Keep ToR names / IP addresses in memory
+  LAS1_TOR_IPs = dict()
+
+  def __init__(self, id, log_file='/var/log/tor.log'):
+    '''
+    Initialize Switch Config
+    '''
+    logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', filename=log_file, level=logging.DEBUG)
+
+    pos = PoSConnect()
+    current = pos.fetch(id)
+    self.tor = current[0]
+    self.port = current[1]
+    self.vlan = current[2]
+    self.description = current[3]
+    self.sku = current[4]
+    self.pod = current[5]
+    self.layer3 = current[6]
+
+    if self.layer3 == 1:
+        print "Pod is layer3, no switch config required"
+        sys.exit(0)
+
+    # This step has to be in the first place to keep ToR names and
+    # IP addresses in memory. Do not change it.
+    with open('data/switch.csv') as csvfile:
+      reader = csv.DictReader(csvfile)
+      for row in reader:
+        Switch_config.LAS1_TOR_IPs[row['Host Name']] = row['IP Address']
+
+    # find switch IP from tor data sheet
+    self.switch_ips = self.get_switch_ip_addresses(self.tor)
+
+    # determines if device is running HPComware or CiscoIOS
+    if self.sku == 'Cisco001':
+      self.switch = CiscoIOS(self.switch_ips, self.port, self.vlan, self.description, self.sku)
+    elif self.sku == 'HP001':
+      self.switch = HPComware(self.switch_ips, self.port, self.vlan, self.description, self.sku, self.pod)
+    elif self.sku == 'HP002':
+      self.switch = HPComware(self.switch_ips, self.port, self.vlan, self.description, self.sku, self.pod)
+    else:
+      raise ValueError('No specific switch type defined')
+      sys.exit(1)
+
+
+  def get_account(self):
+    '''
+    get switch username, password
+    '''
+    return (self.switch.username, self.switch.password)
+
+
+  def get_switch_ip_addresses(self, tor_number):
+    '''
+    translate IP from tor_number
+    '''
+    torA_name = 'LAS1.WIP.TOR.%03dA' % int(tor_number)
+    torB_name = 'LAS1.WIP.TOR.%03dB' % int(tor_number)
+    ip_addresses = (Switch_config.LAS1_TOR_IPs[torA_name], Switch_config.LAS1_TOR_IPs[torB_name])
+    return ip_addresses
+
+
+  def execute_command_on_switch(self, switch_ip, commands, a_or_b):
+    '''
+    execute only from a or b switch
+    '''
+    fucker = dict()
+    if a_or_b == 'a':
+        fucker = self.switch.config_values_a
+    else:
+        fucker = self.switch.config_values_b
+
+    max_retries = 7
+    for n in range(1, max_retries + 1):
+        try:
+            net_connect = ConnectHandler(**fucker)
+            net_connect.find_prompt(delay_factor=NETMIKO_DELAY)
+            break
+        except Exception:
+            if n < max_retries:
+                logging.warning("Could not login to %s; attempt # %d" % (switch_ip, n), exc_info=True)
+                time.sleep(9 + n**2)
+                continue
+            if n == max_retries:
+                logging.error("Could not login to %s" % (switch_ip, ), exc_info=True)
+    else:
+        sys.exit(2)
+
+    for cmd in commands:
+        if cmd.strip() == '':
+            continue
+        logging.debug('Executing ' + cmd )
+        output = net_connect.send_command_expect(cmd, expect_string=self.switch.PROMPT, max_loops=NETMIKO_LOOPS, delay_factor=NETMIKO_DELAY,   strip_prompt=False, strip_command=False)
+        logging.debug(output)
+
+
+  def execute_command_on_both_switches(self):
+    '''
+    defines switch IP address
+    '''
+    # execute on switch A
+    print("Connecting to %sA (%s) for %s" % (self.tor, self.switch_ips[0], self.description))
+    commands_string = self.switch.format_set_vlan_command('a')
+    commands = commands_string.split('\n')
+    import pprint
+    pprint.pprint(commands)
+    self.execute_command_on_switch(self.switch_ips[0], commands, 'a')
+
+    # execute on switch B
+    print("Connecting to %sB (%s) for %s" % (self.tor, self.switch_ips[1], self.description))
+    commands_string = self.switch.format_set_vlan_command('b')
+    commands = commands_string.split('\n')
+    pprint.pprint(commands)
+    self.execute_command_on_switch(self.switch_ips[1], commands, 'b')
+
+
+if __name__ == '__main__':
+    '''
+    Switch VLAN script tool
+    '''
+    id = sys.argv[1]
+    switch = Switch_config(id, '/var/tmp/tor.log')
+    switch.execute_command_on_both_switches()
+(venv)ROOT@pxe-1-001.shared.adm.las1:~/pos
