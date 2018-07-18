@@ -1,0 +1,36 @@
+$ cat lom_power_on
+#!/usr/bin/env python
+
+import hp_ilo_rest
+import time
+import yaml
+import sys
+import MySQLdb
+
+sleeptime = 10
+
+
+id = sys.argv[1]
+
+db = MySQLdb.connect(host="techopsisdb-1-vip.shared.adm.las1.mz-inc.com",user="pos_rw",passwd="kasDFjgr7234DGher78",db="posdb")
+cur = db.cursor()
+
+cur.execute("SELECT lom_ip, host FROM pos_flat WHERE id = '%s'" % id)
+system = cur.fetchone()
+
+print "Powering on %s ..." % system[1]
+
+def main():
+  h = hp_ilo_rest.HPiLO(system[0])
+  h.login()
+  try:
+    h.PowerOn()
+  except Exception as ex:
+    sys.stderr.write("Exception: " + str(ex) + '\n')
+  h.logout()
+
+  cur.execute("UPDATE new_hosts SET status = 'KICKED' WHERE host like '%s'" % system[1])
+  db.commit()
+
+if __name__ == "__main__":
+  main()
