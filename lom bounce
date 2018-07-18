@@ -1,0 +1,18 @@
+$ cat lom_bounce
+#!/usr/bin/env python
+
+import sys
+from models.oob import OOB
+from lib.oob_connection import OOBConnection
+from lib.pos_connect import PoSConnect
+
+if __name__ == '__main__':
+    POS_ID = sys.argv[1]
+    pos = PoSConnect()
+    pos_flat_host = pos.fetch(POS_ID)
+    rack = pos_flat_host[0]
+    port = pos_flat_host[1]
+    oob_ip = OOB().get_ip_by_rack(rack)
+    oob = OOBConnection(oob_ip)
+    oob.bounce_port(port)
+    del oob
