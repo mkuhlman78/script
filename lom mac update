@@ -1,0 +1,24 @@
+ cat lom_mac_update
+#!/usr/bin/env python
+
+from glados.core import UpdateMachineRequest
+from glados.common.controllers.machine import MachineController
+
+import sys
+import argparse
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('id', help='POS ID of target system', type=int)
+    parser.add_argument('-t', '--test', help="Don't update database, just print what changes would be made", action='store_true')
+    args = parser.parse_args()
+
+    request = UpdateMachineRequest(machine_id=args.id)
+    response = MachineController().update_machine(request)
+    if response.updated:
+        print("Update machine {} sucessful serial: {} mac: {}".format(request.machine_id, response.serial, response.mac))
+    else:
+        print("Failed to update machine {} response: {}".format(request.machine_id, response))
+
+if __name__ == "__main__":
+    sys.exit(main())
