@@ -1,0 +1,18 @@
+cat lom_bios_config
+#!/usr/bin/env python
+
+from hp_ilo_rest import *
+import yaml
+import sys
+
+
+target_ids = [int(sys.argv[1])]
+print target_ids
+
+def main():
+  h = HPiLO(ids=target_ids)
+  print yaml.dump(h.SetBIOS())
+  yaml.dump(h.logout())
+
+if __name__ == "__main__":
+  main()
